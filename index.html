@@ -134,6 +134,7 @@ input[type=range]{accent-color:var(--glow);height:28px}
 .tips li{display:flex;gap:10px}
 .tips li::before{content:"";flex:none;width:6px;height:6px;margin-top:8px;border-radius:50%;background:var(--glow);opacity:.7}
 .tips b{color:var(--fg);font-weight:600}
+.ver{margin:4px 4px 0;font:500 11px var(--f-mono);color:#56618a;letter-spacing:.06em}
 
 @media (max-width:560px){
   .now{padding:16px;gap:6px 16px}
@@ -250,6 +251,7 @@ input[type=range]{accent-color:var(--glow);height:28px}
     <li><span><b>Pelan-pelan dulu:</b> putar 0.5× buat ngulik bagian yang cepat; nadanya tetap terbaca dari hasil analisis.</span></li>
     <li><span><b>Posisi fret</b> dipilih yang paling dekat dengan nada sebelumnya. Lingkaran tipis = alternatif kalau mau pindah senar.</span></li>
   </ul>
+  <p class="ver">Ngulik Bass · versi 1.3</p>
 </div>
 
 <script>
@@ -554,12 +556,13 @@ function fit(cv){
   cv._w=w;cv._h=h;const g=cv.getContext('2d');g.setTransform(d,0,0,d,0,0);return g;
 }
 const GLOW='#5ff3de';
+const ppsOf=W=>Math.max(95,W/6);
 function drawRoll(T,info){
   const g=fit(roll),W=roll._w,H=roll._h;
   g.clearRect(0,0,W,H);
   const bg=g.createLinearGradient(0,0,0,H);bg.addColorStop(0,'#0a1124');bg.addColorStop(1,'#050913');
   g.fillStyle=bg;g.fillRect(0,0,W,H);
-  const pps=Math.max(70,W/6),frac=live?0.82:0.5,t0=T-frac*W/pps,tEnd=t0+W/pps;
+  const pps=ppsOf(W),frac=live?0.82:0.5,t0=T-frac*W/pps,tEnd=t0+W/pps;
   const X=t=>(t-t0)*pps;
   const padT=14,padB=24,h=H-padT-padB;const{lo,hi}=rangeOf();
   const Y=m=>padT+(hi-m)/(hi-lo)*h;const pxs=h/(hi-lo);
@@ -578,7 +581,7 @@ function drawRoll(T,info){
   if(!track)return;
   const N=track.notes;
   let start=noteAt(t0-0.5);if(start<0)start=0;
-  let prev=start>0?N[start-1]:null;
+  let prev=start>0?N[start-1]:null;const labels=[];
   for(let i=start;i<N.length;i++){
     const n=N[i];if(n.t0>tEnd)break;
     const x0=X(n.t0),x1=Math.max(X(n.t1),x0+2),y=Y(n.midi);
@@ -590,6 +593,18 @@ function drawRoll(T,info){
     g.beginPath();g.moveTo(x0,y);g.lineTo(x1,y);g.stroke();
     g.fillStyle=GLOW;g.beginPath();g.arc(x0,y,5.5,0,Math.PI*2);g.fill();
     g.shadowBlur=0;prev=n;
+    labels.push({x:x0,y,text:nn(n.midi)+oct(n.midi)});
+  }
+  g.font='700 11px "JetBrains Mono", monospace';g.textBaseline='middle';g.textAlign='left';
+  const placed=[];
+  for(const L of labels){
+    const tw=g.measureText(L.text).width,bx=L.x-tw/2-5,bw=tw+10;
+    let ly=L.y-17;if(ly<padT+6)ly=L.y+17;
+    if(placed.some(q=>bx<q.r+3&&bx+bw>q.l-3&&Math.abs(q.y-ly)<19))continue;
+    placed.push({l:bx,r:bx+bw,y:ly});
+    g.fillStyle='rgba(5,9,19,.82)';g.beginPath();
+    if(g.roundRect)g.roundRect(bx,ly-9,bw,18,5);else g.rect(bx,ly-9,bw,18);g.fill();
+    g.fillStyle='#c8fff6';g.fillText(L.text,bx+5,ly+.5);
   }
   const F=track.frames;let fi=frameAt(t0-0.05);if(fi<0)fi=0;
   g.strokeStyle='rgba(255,255,255,.38)';g.lineWidth=1.2;g.beginPath();let pen=false;
@@ -827,7 +842,7 @@ $('#clearBtn').addEventListener('click',()=>{
 });
 let drag=null;
 roll.addEventListener('pointerdown',e=>{if(live||!track)return;drag={x:e.clientX,t:viewT,was:player.playing};if(player.playing)player.pause();roll.setPointerCapture(e.pointerId);});
-roll.addEventListener('pointermove',e=>{if(!drag)return;const pps=Math.max(70,roll._w/6);viewT=clamp(drag.t-(e.clientX-drag.x)/pps,0,track.duration);render();});
+roll.addEventListener('pointermove',e=>{if(!drag)return;const pps=ppsOf(roll._w);viewT=clamp(drag.t-(e.clientX-drag.x)/pps,0,track.duration);render();});
 const endDrag=()=>{if(!drag)return;const was=drag.was;drag=null;if(player.dur){player.seek(viewT);if(was)player.play();}};
 roll.addEventListener('pointerup',endDrag);roll.addEventListener('pointercancel',endDrag);
 new ResizeObserver(()=>render()).observe(document.querySelector('.wrap'));
